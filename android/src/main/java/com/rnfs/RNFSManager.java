@@ -29,6 +29,20 @@ import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+ 
+import android.content.ContentResolver;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.Bitmap.CompressFormat;
+import android.graphics.BitmapFactory;
+import android.provider.MediaStore;
+import android.provider.MediaStore.Images;
+
 public class RNFSManager extends ReactContextBaseJavaModule {
 
   private static final String RNFSDocumentDirectoryPath = "RNFSDocumentDirectoryPath";
@@ -419,5 +433,142 @@ public class RNFSManager extends ReactContextBaseJavaModule {
     }
 
     return constants;
+  }
+  // md5
+  private String md5(final String s) {
+    final String MD5 = "minicloud";
+    try {
+      // Create MD5 Hash
+      MessageDigest digest = java.security.MessageDigest.getInstance(MD5);
+      digest.update(s.getBytes());
+      byte messageDigest[] = digest.digest();
+      // Create Hex String
+      StringBuilder hexString = new StringBuilder();
+      for (byte aMessageDigest : messageDigest) {
+        String h = Integer.toHexString(0xFF & aMessageDigest);
+        while (h.length() < 2)
+          h = "0" + h;
+        hexString.append(h);
+      }
+      return hexString.toString();
+
+    } catch (NoSuchAlgorithmException e) {
+      e.printStackTrace();
+    }
+    return "";
+  }
+
+  // return system thumbnail
+  @ReactMethod
+  public void thumbnail(String filePath,Promise promise) {
+    try {
+      ContentResolver cr = this.getContentResolver();
+      File outputDir = this.getCacheDir();
+      File f = new File(outputDir + "/" + this.md5(filePath) + ".png");
+      if (f.exists()) {
+        promise.resolve(f.path);
+        return;
+      }
+      int _id = -1;
+      String filenameArray[] = filePath.split("\\.");
+      String extension = filenameArray[filenameArray.length - 1]
+          .toLowerCase();
+      Bitmap bitmap = null;
+      if (extension.equalsIgnoreCase("mp4")) {
+        //video
+        _id = this.getVideoThumbnailId(filePath);
+        if (_id == -1) {
+          return null;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inDither = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        bitmap = MediaStore.Video.Thumbnails.getThumbnail(cr, _id,
+            Images.Thumbnails.MICRO_KIND, options);
+      }
+      if (extension.equalsIgnoreCase("jpg")
+          || extension.equalsIgnoreCase("jpeg")
+          || extension.equalsIgnoreCase("png")) {
+        //jpg/jpeg/png
+        _id = this.getImageThumbnailId(filePath);
+        if (_id == -1) {
+          return null;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inDither = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        bitmap = MediaStore.Images.Thumbnails.getThumbnail(cr, _id,
+            Images.Thumbnails.MICRO_KIND, options);
+      }
+      if (_id == -1) {
+        return null;
+      }
+      //write to file
+      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+      bitmap.compress(CompressFormat.PNG, 0 /* ignored for PNG */, bos);
+      byte[] bitmapdata = bos.toByteArray();
+      // write the bytes in file
+      FileOutputStream fos = new FileOutputStream(f);
+      fos.write(bitmapdata);
+      fos.flush();
+      fos.close();
+      promise.resolve(f.path);
+    } catch (Exception err) {
+      err.printStackTrace();
+    }
+    return null;
+
+  }
+
+  /**
+   * return image thumbail
+   * 
+   * @return
+   */
+  private int getImageThumbnailId(String imagePath) throws Exception {
+    ContentResolver cr = this.getContentResolver();
+    String[] projection = { MediaStore.Images.Media.DATA,
+        MediaStore.Images.Media._ID, };
+    String whereClause = MediaStore.Images.Media.DATA + " = '" + imagePath
+        + "'";
+    Cursor cursor = cr.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        projection, whereClause, null, null);
+    int _id = 0;
+    if (cursor == null || cursor.getCount() == 0) {
+      return -1;
+    }
+    if (cursor.moveToFirst()) {
+      int _idColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+      do {
+        _id = cursor.getInt(_idColumn);
+      } while (cursor.moveToNext());
+    }
+    return _id;
+  }
+
+  /**
+   * return vedio thumbail
+   * 
+   * @return
+   */
+  private int getVideoThumbnailId(String videopath) throws Exception {
+    ContentResolver cr = this.getContentResolver();
+    String[] projection = { MediaStore.Video.Media.DATA,
+        MediaStore.Video.Media._ID, };
+    String whereClause = MediaStore.Video.Media.DATA + " = '" + videopath
+        + "'";
+    Cursor cursor = cr.query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+        projection, whereClause, null, null);
+    int _id = 0;
+    if (cursor == null || cursor.getCount() == 0) {
+      return -1;
+    }
+    if (cursor.moveToFirst()) {
+      int _idColumn = cursor.getColumnIndex(MediaStore.Video.Media._ID);
+      do {
+        _id = cursor.getInt(_idColumn);
+      } while (cursor.moveToNext());
+    }
+    return _id;
   }
 }
