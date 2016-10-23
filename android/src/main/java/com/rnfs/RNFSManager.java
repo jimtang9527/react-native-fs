@@ -436,7 +436,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
   }
   // md5
   private String md5(final String s) {
-    final String MD5 = "minicloud";
+    final String MD5 = "MD5";
     try {
       // Create MD5 Hash
       MessageDigest digest = java.security.MessageDigest.getInstance(MD5);
@@ -460,13 +460,13 @@ public class RNFSManager extends ReactContextBaseJavaModule {
 
   // return system thumbnail
   @ReactMethod
-  public void thumbnail(String filePath,Promise promise) {
+  public void getThumbnail(String filePath,Promise promise) {
     try {
-      ContentResolver cr = this.getContentResolver();
-      File outputDir = this.getCacheDir();
+      ContentResolver cr = this.getReactApplicationContext().getContentResolver();
+      File outputDir = this.getReactApplicationContext().getCacheDir();
       File f = new File(outputDir + "/" + this.md5(filePath) + ".png");
       if (f.exists()) {
-        promise.resolve(f.path);
+        promise.resolve(f.getPath());
         return;
       }
       int _id = -1;
@@ -478,7 +478,8 @@ public class RNFSManager extends ReactContextBaseJavaModule {
         //video
         _id = this.getVideoThumbnailId(filePath);
         if (_id == -1) {
-          return null;
+          promise.resolve(null);
+          return;
         }
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inDither = false;
@@ -492,7 +493,8 @@ public class RNFSManager extends ReactContextBaseJavaModule {
         //jpg/jpeg/png
         _id = this.getImageThumbnailId(filePath);
         if (_id == -1) {
-          return null;
+          promise.resolve(null);
+          return;
         }
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inDither = false;
@@ -501,7 +503,8 @@ public class RNFSManager extends ReactContextBaseJavaModule {
             Images.Thumbnails.MICRO_KIND, options);
       }
       if (_id == -1) {
-        return null;
+         promise.resolve(null);
+         return;
       }
       //write to file
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -512,12 +515,12 @@ public class RNFSManager extends ReactContextBaseJavaModule {
       fos.write(bitmapdata);
       fos.flush();
       fos.close();
-      promise.resolve(f.path);
+      promise.resolve(f.getPath());
+      return;
     } catch (Exception err) {
       err.printStackTrace();
     }
-    return null;
-
+     promise.resolve(null);
   }
 
   /**
@@ -526,7 +529,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
    * @return
    */
   private int getImageThumbnailId(String imagePath) throws Exception {
-    ContentResolver cr = this.getContentResolver();
+    ContentResolver cr = this.getReactApplicationContext().getContentResolver();
     String[] projection = { MediaStore.Images.Media.DATA,
         MediaStore.Images.Media._ID, };
     String whereClause = MediaStore.Images.Media.DATA + " = '" + imagePath
@@ -552,7 +555,7 @@ public class RNFSManager extends ReactContextBaseJavaModule {
    * @return
    */
   private int getVideoThumbnailId(String videopath) throws Exception {
-    ContentResolver cr = this.getContentResolver();
+    ContentResolver cr = this.getReactApplicationContext().getContentResolver();
     String[] projection = { MediaStore.Video.Media.DATA,
         MediaStore.Video.Media._ID, };
     String whereClause = MediaStore.Video.Media.DATA + " = '" + videopath

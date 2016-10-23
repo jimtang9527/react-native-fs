@@ -140,6 +140,10 @@ var RNFS = {
     return RNFSManager.getFSInfo();
   },
 
+  getThumbnail(filepath: string): Promise<string> {
+    return RNFSManager.getThumbnail(filepath);
+  },
+
   unlink(filepath: string): Promise<void> {
     return RNFSManager.unlink(normalizeFilePath(filepath)).then(() => void 0);
   },
